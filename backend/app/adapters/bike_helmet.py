@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class HelmetViolationCandidate:
-    """A no-helmet observation proven to belong to a rider on a motorcycle."""
+    """A no-helmet observation proven to belong to a bike-rider detection."""
 
     bounding_box: BoundingBox
     confidence: float
@@ -92,7 +92,14 @@ class BikeHelmetAdapter:
             return False
 
     def detect(self, frame: np.ndarray) -> list[HelmetViolationCandidate]:
-        """Return only no-helmet boxes associated with riders and motorcycles."""
+        """Return no-helmet boxes associated with the model's bike-rider class.
+
+        Bike-Helmet-Detectionv2 exposes ``Bike_Rider``, ``Helmet``, and
+        ``No_Helmet`` classes.  It does *not* expose a separate motorcycle
+        class, so requiring one here silently filters every legitimate result.
+        A ``Bike_Rider`` box already represents the rider-and-bike pair and is
+        also the safest available crop for downstream plate recognition.
+        """
         if not isinstance(frame, np.ndarray) or frame.ndim < 2 or frame.size == 0:
             logger.warning("Bike helmet inference skipped because the frame is invalid")
             return []
@@ -117,11 +124,12 @@ class BikeHelmetAdapter:
             candidates: list[HelmetViolationCandidate] = []
             for no_helmet in no_helmets:
                 rider = _best_overlap(no_helmet.bounding_box, riders)
-                # A person alone is never a rider for this engine. A selected
-                # rider must also spatially belong to an observed motorcycle.
-                motorcycle = _best_overlap(rider.bounding_box, motorcycles) if rider else None
-                if rider is None or motorcycle is None:
+                if rider is None:
                     continue
+                # Some compatible custom weights may include a motorcycle
+                # class. Prefer it when present; the upstream model does not,
+                # so the Bike_Rider detection is the meaningful fallback.
+                motorcycle = _best_overlap(rider.bounding_box, motorcycles) or rider
                 candidates.append(
                     HelmetViolationCandidate(
                         bounding_box=no_helmet.bounding_box,

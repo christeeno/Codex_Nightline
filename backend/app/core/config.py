@@ -50,6 +50,14 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://127.0.0.1:5173"
     )
 
+    # Government reporting is opt-in.  A deployment must point this at the
+    # receiving authority's REST endpoint; without it no report can be sent.
+    government_submission_url: str | None = None
+    government_submission_api_token: str | None = None
+    government_authority_name: str = "government authority"
+    government_submission_timeout_seconds: float = 20.0
+    government_include_evidence_images: bool = True
+
     # License-plate recognition values are deployment-specific and must not
     # be embedded in the detector or OCR pipeline.
     ocr_confidence: float = 0.80

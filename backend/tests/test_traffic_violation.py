@@ -101,6 +101,33 @@ def test_upstream_tracking_id_is_preserved(tmp_path) -> None:
     assert result.detections[0].tracking_id == "42"
 
 
+def test_upstream_bike_rider_class_does_not_require_a_motorcycle_label(tmp_path) -> None:
+    """The bundled upstream weights provide Bike_Rider, not motorcycle."""
+    settings = _settings(tmp_path)
+    model = FakeModel(
+        [[
+            FakeBox(0, 0.91, [10, 10, 80, 95]),
+            FakeBox(2, 0.83, [25, 12, 45, 35]),
+        ]]
+    )
+    # Mirror the names embedded in Bike-Helmet-Detectionv2's best.pt.
+    original_track = model.track
+
+    def track(*args, **kwargs):
+        result = original_track(*args, **kwargs)
+        result[0].names = {0: "Bike_Rider", 1: "Helmet", 2: "No_Helmet"}
+        return result
+
+    model.track = track
+    frame = np.zeros((120, 240, 3), dtype=np.uint8)
+
+    result = TrafficViolationEngine(adapter=BikeHelmetAdapter(settings, model_factory=lambda _: model), settings=settings).analyze_video(
+        "upstream-classes.mp4", [TrafficFrame(frame, 0, 0.0)]
+    )
+
+    assert len(result.detections) == 1
+
+
 def test_missing_weights_and_invalid_pipeline_are_non_fatal(tmp_path) -> None:
     settings = Settings(bike_helmet_model_path=str(tmp_path / "missing.pt"))
     adapter = BikeHelmetAdapter(settings, model_factory=lambda _: FakeModel([]))

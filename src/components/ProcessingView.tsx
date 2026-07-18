@@ -26,6 +26,8 @@ export default function ProcessingView({ setView, report, onCompleted }: Process
   const [currentDetections, setCurrentDetections] = useState(0);
   const [liveIncidents, setLiveIncidents] = useState(0);
   const [floatingLogs, setFloatingLogs] = useState<string[]>([DECORATIVE_LOGS[0], DECORATIVE_LOGS[1]]);
+  const [failed, setFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (!report) { setView('UPLOAD'); return; }
@@ -41,8 +43,15 @@ export default function ProcessingView({ setView, report, onCompleted }: Process
         setCurrentDetections(Math.max(0, Math.floor(data.percent_complete / 35)));
         setLiveIncidents(Math.max(0, Math.floor(data.percent_complete / 50)));
         setFloatingLogs([data.current_stage, data.error || DECORATIVE_LOGS[Math.min(DECORATIVE_LOGS.length - 1, Math.floor(data.percent_complete / 20))]]);
-        if (data.status === 'READY_FOR_REVIEW' || data.status === 'completed') { await onCompleted(); if (active) setView('CONSOLE'); }
-        if (data.status === 'FAILED' || data.status === 'failed') { setFloatingLogs(['Processing failed', data.error || 'Try uploading another supported video.']); }
+        if (data.status === 'READY_FOR_REVIEW' || data.status === 'completed') {
+          setFailed(false);
+          await onCompleted();
+          if (active) setView('CONSOLE');
+        }
+        if (data.status === 'FAILED' || data.status === 'failed') {
+          setFailed(true);
+          setFloatingLogs(['Processing failed', data.error || 'You can retry this analysis.']);
+        }
       } catch (error) {
         if (active) setFloatingLogs(['Connection issue', error instanceof Error ? error.message : 'Unable to read processing progress.']);
       }
@@ -59,6 +68,22 @@ export default function ProcessingView({ setView, report, onCompleted }: Process
     return 3; // Synthesizing Report
   };
 
+  const retryAnalysis = async () => {
+    if (!report) return;
+    setRetrying(true);
+    try {
+      await api.analyze(report.id);
+      setFailed(false);
+      setProgress(0);
+      setFramesProcessed(0);
+      setFloatingLogs(['Analysis restarted', 'Preparing video frames...']);
+    } catch (error) {
+      setFloatingLogs(['Could not restart analysis', error instanceof Error ? error.message : 'Please try again.']);
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <div className="h-screen bg-slate-950 text-slate-100 overflow-hidden flex flex-col justify-between select-none">
       {/* Suppressed Header */}
@@ -71,8 +96,17 @@ export default function ProcessingView({ setView, report, onCompleted }: Process
             V3.2 Active
           </span>
         </div>
-        <div>
-          <button 
+        <div className="flex items-center gap-3">
+          {failed && (
+            <button
+              onClick={() => void retryAnalysis()}
+              disabled={retrying}
+              className="font-display text-xs text-blue-300 border border-blue-400/40 hover:bg-blue-500/10 disabled:cursor-wait disabled:opacity-60 px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
+            >
+              {retrying ? 'Restarting...' : 'Retry Analysis'}
+            </button>
+          )}
+          <button
             onClick={() => setView('UPLOAD')}
             className="font-display text-xs text-red-400 border border-red-500/30 hover:bg-red-500/10 px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
           >

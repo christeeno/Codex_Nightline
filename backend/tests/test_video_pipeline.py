@@ -8,10 +8,12 @@ import cv2
 import numpy as np
 import pytest
 from fastapi import UploadFile
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
+from app.core import database as database_module
 from app.core.database import Base
+from app.models.report import Incident
 from app.schemas.detections import Detection, DetectionBatch
 from app.services.frame_sampling import FrameSampler
 from app.services.orchestrator import ProcessingOrchestrator
@@ -79,6 +81,55 @@ def test_orchestrator_tracks_completion_and_preserves_source_video(tmp_path: Pat
     assert progress is not None
     assert progress.percent_complete == 100
     assert progress.status == "completed"
+
+
+def test_initialize_database_upgrades_legacy_incident_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Existing SQLite databases can accept incidents added by newer code."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE reports (id VARCHAR(36) PRIMARY KEY)"))
+        connection.execute(
+            text(
+                """CREATE TABLE incidents (
+                id VARCHAR(36) PRIMARY KEY,
+                report_id VARCHAR(36) NOT NULL,
+                type VARCHAR(64) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                timestamp FLOAT NOT NULL,
+                frame_number INTEGER NOT NULL,
+                confidence FLOAT NOT NULL,
+                license_plate VARCHAR(32),
+                ocr_confidence FLOAT,
+                evidence_path VARCHAR(1024),
+                bounding_box JSON,
+                status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                reward_credits INTEGER NOT NULL DEFAULT 0,
+                details JSON NOT NULL DEFAULT '{}',
+                created_at DATETIME NOT NULL
+                )"""
+            )
+        )
+
+    monkeypatch.setattr(database_module, "engine", engine)
+    database_module.initialize_database()
+
+    columns = {column["name"] for column in inspect(engine).get_columns("incidents")}
+    assert {"severity", "approved", "tracking_object"} <= columns
+
+    session = sessionmaker(bind=engine)()
+    session.add(
+        Incident(
+            id="incident-1",
+            report_id="report-1",
+            type="POTHOLE",
+            title="Road Surface Pothole",
+            timestamp=1.0,
+            frame_number=30,
+            confidence=0.9,
+            severity="HIGH",
+        )
+    )
+    session.flush()
 
 
 def test_detection_contract_and_temporary_evidence_cleanup(tmp_path: Path) -> None:

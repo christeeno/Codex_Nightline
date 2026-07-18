@@ -22,11 +22,13 @@ export interface Incident {
 }
 
 export interface SubmissionSummary {
-  trackingId: string;
+  trackingId: string | null;
   submittedAt: string;
   incidentCount: number;
   rewardCredits: number;
   governmentResponse: string;
+  deliveryMode: 'government' | 'mock';
+  reportText: string | null;
 }
 
 export interface DashboardStats {

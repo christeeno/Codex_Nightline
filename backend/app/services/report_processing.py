@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.license_plate_detector import OpenCVPlateDetector
 from app.adapters.paddle_ocr import PaddleOCRAdapter
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.database import SessionLocal
 from app.models.report import Incident, Report
 from app.schemas.incidents import BoundingBox
@@ -75,7 +75,8 @@ def _boxes(model: Any, image: np.ndarray, confidence: float) -> list[tuple[str, 
     normalized: list[tuple[str, float, BoundingBox]] = []
     for box in result[0].boxes or []:
         class_id = int(float(box.cls.item()))
-        label = str(names.get(class_id, class_id) if isinstance(names, dict) else names[class_id]).lower()
+        label = str(names.get(class_id, class_id) if isinstance(names, dict) else names[class_id])
+        label = label.strip().lower().replace("_", " ")
         x1, y1, x2, y2 = (float(value) for value in box.xyxy[0].tolist())
         if x2 > x1 and y2 > y1:
             normalized.append((label, float(box.conf.item()), BoundingBox(left=x1, top=y1, right=x2, bottom=y2)))
@@ -88,17 +89,32 @@ def _overlaps(first: BoundingBox, second: BoundingBox) -> bool:
     return right > left and bottom > top
 
 
-def _traffic_candidates(model: Any, image: np.ndarray, confidence: float) -> list[tuple[float, BoundingBox]]:
-    """Require an explicit motorcycle and no-helmet label to prevent false positives.
+def _traffic_candidates(
+    model: Any, image: np.ndarray, confidence: float, settings: Settings
+) -> list[tuple[float, BoundingBox]]:
+    """Associate no-helmet detections with Bike-Helmet-Detectionv2 riders.
 
-    In particular, pedestrians and cars cannot produce an event because neither
-    is accepted as a motorcycle.  A helmet label alone is not evidence of a
-    violation.
+    The upstream weights use ``Bike_Rider`` rather than a standalone
+    ``motorcycle`` class.  Requiring a motorcycle label made the production
+    worker discard every helmet violation.  The rider-and-bike box is returned
+    for the evidence crop and optional plate recognition.
     """
     detections = _boxes(model, image, confidence)
-    motorcycles = [box for label, _, box in detections if any(word in label for word in ("motorcycle", "motorbike", "two_wheeler"))]
-    missing_helmets = [(score, box) for label, score, box in detections if "helmet" in label and any(word in label for word in ("no", "without", "missing"))]
-    return [(score, motorcycle) for score, helmet in missing_helmets for motorcycle in motorcycles if _overlaps(helmet, motorcycle)]
+    riders = [box for label, _, box in detections if label in settings.rider_labels]
+    motorcycles = [box for label, _, box in detections if label in settings.motorcycle_labels]
+    missing_helmets = [
+        (score, box)
+        for label, score, box in detections
+        if label in settings.no_helmet_labels
+    ]
+    candidates: list[tuple[float, BoundingBox]] = []
+    for score, helmet in missing_helmets:
+        rider = next((box for box in riders if _overlaps(helmet, box)), None)
+        if rider is None:
+            continue
+        motorcycle = next((box for box in motorcycles if _overlaps(rider, box)), rider)
+        candidates.append((score, motorcycle))
+    return candidates
 
 
 def _pothole_candidates(model: Any, image: np.ndarray, confidence: float) -> list[tuple[float, BoundingBox]]:
@@ -190,7 +206,7 @@ def process_report(report_id: str) -> None:
         database.execute(delete(Incident).where(Incident.report_id == report.id))
         model_warnings: list[str] = []
         traffic_model = _optional_model(
-            "Bike-Helmet-Detectionv2", settings.helmet_model_path, model_warnings
+            "Bike-Helmet-Detectionv2", settings.bike_helmet_model_path, model_warnings
         )
         pothole_model = _optional_model(
             "PeterHdd/pothole-detection-yolo", settings.model_path, model_warnings
@@ -204,7 +220,12 @@ def process_report(report_id: str) -> None:
                 traffic_due, traffic_next = traffic_sampler.accepts(frame, traffic_next)
                 road_due, road_next = road_sampler.accepts(frame, road_next)
                 if traffic_due and traffic_model is not None:
-                    for confidence, motorcycle in _traffic_candidates(traffic_model, frame.image, settings.pothole_confidence):
+                    for confidence, motorcycle in _traffic_candidates(
+                        traffic_model,
+                        frame.image,
+                        settings.traffic_confidence_threshold,
+                        settings,
+                    ):
                         _record(database, report, recent, kind="HELMET_VIOLATION", title="Missing Helmet Detection", timestamp=frame.timestamp, frame_number=frame.frame_number, confidence=confidence, image=frame.image, motorcycle=motorcycle)
                 if road_due and pothole_model is not None:
                     for confidence, _ in _pothole_candidates(pothole_model, frame.image, settings.pothole_confidence):

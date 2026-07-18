@@ -44,26 +44,43 @@ def _migrate_sqlite_schema() -> None:
     These additive migrations keep local development databases compatible without
     discarding uploaded-report history.
     """
-    if engine.dialect.name != "sqlite" or "reports" not in inspect(engine).get_table_names():
+    if engine.dialect.name != "sqlite":
         return
 
-    existing_columns = {
-        column["name"] for column in inspect(engine).get_columns("reports")
-    }
-    report_columns = {
-        "updated_at": "DATETIME",
-        "video_name": "VARCHAR(255)",
-        "video_duration": "FLOAT",
-        "processing_time": "FLOAT",
-        "submission_status": "VARCHAR(32) NOT NULL DEFAULT 'NOT_SUBMITTED'",
-        "reward_status": "VARCHAR(100)",
-        "summary_json": "JSON NOT NULL DEFAULT '{}'",
+    migrations = {
+        "reports": {
+            "updated_at": "DATETIME",
+            "video_name": "VARCHAR(255)",
+            "video_duration": "FLOAT",
+            "processing_time": "FLOAT",
+            "submission_status": "VARCHAR(32) NOT NULL DEFAULT 'NOT_SUBMITTED'",
+            "reward_status": "VARCHAR(100)",
+            "summary_json": "JSON NOT NULL DEFAULT '{}'",
+        },
+        # These fields were added after the first local database version.  Keep
+        # their defaults compatible with the SQLAlchemy model so old incident
+        # rows remain valid and new analysis runs can insert detections.
+        "incidents": {
+            "severity": "VARCHAR(50)",
+            "approved": "BOOLEAN NOT NULL DEFAULT 0",
+            "tracking_object": "VARCHAR(255)",
+        },
     }
 
     with engine.begin() as connection:
-        for name, definition in report_columns.items():
-            if name not in existing_columns:
-                connection.execute(text(f"ALTER TABLE reports ADD COLUMN {name} {definition}"))
+        inspector = inspect(connection)
+        tables = set(inspector.get_table_names())
+        for table, columns in migrations.items():
+            if table not in tables:
+                continue
+            existing_columns = {
+                column["name"] for column in inspector.get_columns(table)
+            }
+            for name, definition in columns.items():
+                if name not in existing_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+                    )
 
 
 def initialize_database() -> None:

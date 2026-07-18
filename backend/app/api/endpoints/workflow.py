@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.report import Incident, Report, Submission
 from app.services.report_processing import process_report
+from app.services.government_reporting import GovernmentReporter, GovernmentReportingError, MockGovernmentReporter
 from app.services.video_reader import VideoOpenError, VideoReader
 from app.services.video_storage import UploadValidationError, VideoStorage
 
@@ -191,7 +192,7 @@ def reject_incident(report_id: str, incident_id: str, database: Session = Depend
     return _review_incident(report_id, incident_id, False, database)
 
 
-@router.post("/reports/{report_id}/submit", status_code=status.HTTP_201_CREATED, summary="Create mock government submission")
+@router.post("/reports/{report_id}/submit", status_code=status.HTTP_201_CREATED, summary="Deliver a reviewed report to the configured government authority")
 def submit_report(report_id: str, database: Session = Depends(get_db)) -> dict:
     report = database.get(Report, report_id)
     if report is None:
@@ -201,20 +202,69 @@ def submit_report(report_id: str, database: Session = Depends(get_db)) -> dict:
     approved_count = database.scalar(select(func.count()).select_from(Incident).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
     if report.status != "SUBMITTED" and approved_count == 0:
         raise HTTPException(status_code=409, detail="Approve at least one incident before submitting.")
-    if report.tracking_id:
+    if report.status == "SUBMITTED":
         reward = database.scalar(select(func.coalesce(func.sum(Incident.reward_credits), 0)).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
-        return {"message": "Report was already submitted.", "data": {"report_id": report.id, "tracking_id": report.tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": "Mock transport authority receipt accepted."}}
-    tracking_id = f"PARA-{datetime.now(timezone.utc):%Y%m%d}-{uuid4().hex[:8].upper()}"
-    submission = Submission(report_id=report.id, government_tracking_id=tracking_id, submission_status="SUBMITTED", response_json={"mock": True, "accepted_at": datetime.now(timezone.utc).isoformat()})
+        return {"message": "Report was already delivered.", "data": {"report_id": report.id, "tracking_id": report.tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": f"Previously accepted by {settings.government_authority_name}."}}
+
+    approved_incidents = list(database.scalars(select(Incident).where(Incident.report_id == report.id, Incident.status == "APPROVED")))
+    if not settings.government_submission_url:
+        receipt = MockGovernmentReporter().submit(report, approved_incidents)
+        submission = Submission(
+            report_id=report.id,
+            government_tracking_id=receipt.tracking_id,
+            submission_status="MOCK_PREPARED",
+            response_json=receipt.response,
+        )
+        report.submission_status = "MOCK_PREPARED"
+        report.tracking_id = receipt.tracking_id
+        database.add(submission)
+        database.commit()
+        return {"message": receipt.message, "data": {"report_id": report.id, "tracking_id": receipt.tracking_id, "status": "MOCK_PREPARED", "submitted_at": submission.submitted_at, "incident_count": approved_count, "reward_credits": 0, "government_response": receipt.message, "delivery_mode": receipt.delivery_mode, "report_text": receipt.report_text}}
+
+    try:
+        receipt = GovernmentReporter(settings).submit(report, approved_incidents)
+    except GovernmentReportingError as exc:
+        database.add(Submission(
+            report_id=report.id,
+            submission_status="FAILED",
+            response_json={"error": str(exc), "attempted_at": datetime.now(timezone.utc).isoformat()},
+        ))
+        database.commit()
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    submission = Submission(
+        report_id=report.id,
+        government_tracking_id=receipt.tracking_id,
+        submission_status="SUBMITTED",
+        response_json=receipt.response,
+    )
     report.status = "SUBMITTED"
     report.submission_status = "SUBMITTED"
-    report.tracking_id = tracking_id
+    report.tracking_id = receipt.tracking_id
     report.submitted_at = datetime.now(timezone.utc)
     database.add(submission)
     database.commit()
     approved_count = database.scalar(select(func.count()).select_from(Incident).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
     reward = database.scalar(select(func.coalesce(func.sum(Incident.reward_credits), 0)).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
-    return {"message": "Mock government submission created.", "data": {"report_id": report.id, "tracking_id": tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": "Mock transport authority receipt accepted."}}
+    return {"message": "Report delivered to government authority.", "data": {"report_id": report.id, "tracking_id": receipt.tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": receipt.message, "delivery_mode": receipt.delivery_mode, "report_text": receipt.report_text}}
+
+
+@router.post("/mock-government/reports", status_code=status.HTTP_201_CREATED, summary="Mock government report receiver")
+def mock_government_report(payload: dict = Body(...)) -> dict:
+    """Demo-only receiver that acknowledges a prepared report without external delivery."""
+    report_text = payload.get("report_text")
+    if not isinstance(report_text, str) or not report_text.strip():
+        raise HTTPException(status_code=422, detail="report_text is required.")
+    reference = f"MOCK-GOV-{uuid4().hex[:8].upper()}"
+    return {
+        "message": "Mock authority accepted the demo report. No real authority was contacted.",
+        "data": {
+            "tracking_id": reference,
+            "status": "PREPARED",
+            "authority": MockGovernmentReporter.authority_name,
+            "report_text": report_text,
+        },
+    }
 
 
 @router.get("/dashboard", summary="Get citizen dashboard totals")

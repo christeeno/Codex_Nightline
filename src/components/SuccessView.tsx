@@ -48,13 +48,13 @@ export default function SuccessView({ setView, fileName, submission }: SuccessVi
 
         {/* Header Information */}
         <h1 className="font-display text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-4 text-center tracking-tight">
-          Report Submitted Successfully
+          {submission?.deliveryMode === 'mock' ? 'Mock Government Report Ready' : 'Report Delivered Successfully'}
         </h1>
 
         <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 py-1.5 px-4 rounded-full mb-10">
           <Receipt size={14} className="text-blue-300" />
           <span className="font-display text-[10px] text-blue-300 font-bold uppercase tracking-wider">
-            Tracking ID: #{submission?.trackingId || 'PENDING'}
+            {submission?.deliveryMode === 'mock' ? 'Mock reference' : 'Government receipt'}: {submission?.trackingId || 'Accepted — no tracking ID returned'}
           </span>
         </div>
 
@@ -102,6 +102,7 @@ export default function SuccessView({ setView, fileName, submission }: SuccessVi
         </div>
 
         {submission?.governmentResponse && <p className="mt-6 text-center text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">{submission.governmentResponse}</p>}
+        {submission?.reportText && <pre className="mt-4 w-full whitespace-pre-wrap text-left text-xs leading-5 text-slate-300 bg-slate-950 border border-slate-800 rounded-lg p-4 font-sans">{submission.reportText}</pre>}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row w-full gap-4 justify-center">

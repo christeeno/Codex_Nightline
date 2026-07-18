@@ -73,7 +73,7 @@ export default function App() {
   const handleSubmit = async () => {
     if (!report) return;
     const result = await api.submit(report.id);
-    setSubmission({ trackingId: result.tracking_id, submittedAt: result.submitted_at, incidentCount: result.incident_count, rewardCredits: result.reward_credits, governmentResponse: result.government_response });
+    setSubmission({ trackingId: result.tracking_id, submittedAt: result.submitted_at, incidentCount: result.incident_count, rewardCredits: result.reward_credits, governmentResponse: result.government_response, deliveryMode: result.delivery_mode, reportText: result.report_text });
     await refreshDashboard();
     setView('SUCCESS');
   };

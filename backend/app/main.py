@@ -39,7 +39,7 @@ app = FastAPI(
     version=settings.app_version,
     debug=settings.debug,
     lifespan=lifespan,
-    description="Upload dashcam footage, run AI analysis, review incidents, and submit a mock report.",
+    description="Upload dashcam footage, run AI analysis, review incidents, and deliver reports to a configured government authority.",
 )
 
 app.add_middleware(

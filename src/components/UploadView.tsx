@@ -35,10 +35,13 @@ export default function UploadView({ setView, onUploadComplete }: UploadViewProp
     setFile(newFile);
     setReport(null);
     setError(null);
-    setProgress(10);
+    setProgress(0);
     setUploadSpeed('Uploading securely…');
     try {
-      const uploaded = await api.upload(selectedFile);
+      const uploaded = await api.upload(selectedFile, percentComplete => {
+        setProgress(percentComplete);
+        setUploadSpeed(percentComplete >= 99 ? 'Validating video…' : 'Uploading securely…');
+      });
       setProgress(100);
       setUploadSpeed('Validated');
       setReport(uploaded);

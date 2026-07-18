@@ -42,12 +42,16 @@ export interface DashboardResponse {
 }
 
 export interface Submission {
-  tracking_id: string;
+  tracking_id: string | null;
   submitted_at: string;
   incident_count: number;
   reward_credits: number;
   government_response: string;
+  delivery_mode: 'government' | 'mock';
+  report_text: string | null;
 }
+
+type UploadProgressHandler = (percentComplete: number) => void;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, init);
@@ -60,10 +64,35 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  upload: (file: File) => {
+  upload: (file: File, onProgress?: UploadProgressHandler) => {
     const data = new FormData();
     data.append('video', file);
-    return request<ApiReport>('/upload', { method: 'POST', body: data });
+    // Fetch deliberately does not expose upload progress in browsers.  Use
+    // XMLHttpRequest here so a large video does not look frozen at 10% while
+    // its bytes are still being sent to the backend.
+    return new Promise<ApiReport>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('POST', `${API_BASE}/upload`);
+      request.responseType = 'json';
+      request.upload.addEventListener('progress', event => {
+        if (!event.lengthComputable) return;
+        // Keep 100% for a successful server response; the backend still needs
+        // to validate the completed file after all bytes have been received.
+        onProgress?.(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+      });
+      request.addEventListener('load', () => {
+        const body = request.response || (() => {
+          try { return JSON.parse(request.responseText); } catch { return {}; }
+        })();
+        if (request.status < 200 || request.status >= 300) {
+          reject(new Error(body?.detail || body?.errors?.[0] || `Request failed (${request.status}).`));
+          return;
+        }
+        resolve(body && typeof body === 'object' && 'data' in body ? body.data as ApiReport : body as ApiReport);
+      });
+      request.addEventListener('error', () => reject(new Error('Network error while uploading the video.')));
+      request.send(data);
+    });
   },
   analyze: (id: string) => request(`/analyze/${id}`, { method: 'POST' }),
   progress: (id: string) => request<Progress>(`/reports/${id}/progress`),
