@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import get_settings
@@ -37,11 +37,41 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
+def _migrate_sqlite_schema() -> None:
+    """Add columns introduced after an existing local SQLite database was created.
+
+    ``create_all`` only creates missing tables; it does not alter existing ones.
+    These additive migrations keep local development databases compatible without
+    discarding uploaded-report history.
+    """
+    if engine.dialect.name != "sqlite" or "reports" not in inspect(engine).get_table_names():
+        return
+
+    existing_columns = {
+        column["name"] for column in inspect(engine).get_columns("reports")
+    }
+    report_columns = {
+        "updated_at": "DATETIME",
+        "video_name": "VARCHAR(255)",
+        "video_duration": "FLOAT",
+        "processing_time": "FLOAT",
+        "submission_status": "VARCHAR(32) NOT NULL DEFAULT 'NOT_SUBMITTED'",
+        "reward_status": "VARCHAR(100)",
+        "summary_json": "JSON NOT NULL DEFAULT '{}'",
+    }
+
+    with engine.begin() as connection:
+        for name, definition in report_columns.items():
+            if name not in existing_columns:
+                connection.execute(text(f"ALTER TABLE reports ADD COLUMN {name} {definition}"))
+
+
 def initialize_database() -> None:
     """Create application tables and verify the database connection."""
     import app.models  # noqa: F401 - registers all model metadata before creation
 
     Base.metadata.create_all(bind=engine)
+    _migrate_sqlite_schema()
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
 

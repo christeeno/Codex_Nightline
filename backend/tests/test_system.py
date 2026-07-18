@@ -4,8 +4,10 @@ import asyncio
 from pathlib import Path
 
 import httpx
+from sqlalchemy import inspect
 
 from app.core.config import get_settings
+from app.core.database import engine
 from app.main import app
 
 
@@ -39,5 +41,11 @@ def test_system_endpoints_and_openapi() -> None:
     assert health_response.json() == {"healthy": True}
     assert openapi_response.status_code == 200
     assert docs_response.status_code == 200
+    assert {
+        "summary_json",
+        "submission_status",
+        "video_name",
+        "video_duration",
+    } <= {column["name"] for column in inspect(engine).get_columns("reports")}
     assert Path(settings.upload_folder).is_dir()
     assert Path(settings.weights_folder).is_dir()
