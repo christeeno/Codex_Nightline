@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Geist", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+  
+  --color-surface-bright: #363941;
+  --color-error-container: #93000a;
+  --color-on-primary-fixed: #001a42;
+  --color-on-primary-fixed-variant: #004395;
+  --color-tertiary-fixed: #ffddb8;
+  --color-inverse-primary: #005ac2;
+  --color-primary-fixed: #d8e2ff;
+  --color-surface-tint: #adc6ff;
+  --color-on-background: #e1e2ec;
+  --color-tertiary-fixed-dim: #ffb95f;
+  --color-secondary-fixed: #6ffbbe;
+  --color-surface-container: #1d2027;
+  --color-on-error-container: #ffdad6;
+  --color-surface-variant: #32353c;
+  --color-secondary-container: #00a572;
+  --color-tertiary-container: #ca8100;
+  --color-surface: #10131a;
+  --color-on-secondary-fixed: #002113;
+  --color-surface-dim: #10131a;
+  --color-primary-container: #4d8eff;
+  --color-inverse-surface: #e1e2ec;
+  --color-on-surface: #e1e2ec;
+  --color-error: #ffb4ab;
+  --color-on-tertiary-container: #3e2400;
+  --color-surface-container-low: #191b23;
+  --color-on-surface-variant: #c2c6d6;
+  --color-on-primary: #002e6a;
+  --color-on-secondary-fixed-variant: #005236;
+  --color-outline: #8c909f;
+  --color-primary-fixed-dim: #adc6ff;
+  --color-on-secondary-container: #00311f;
+  --color-on-tertiary-fixed: #2a1700;
+  --color-primary: #adc6ff;
+  --color-background: #10131a;
+  --color-surface-container-highest: #32353c;
+  --color-outline-variant: #424754;
+  --color-secondary: #4edea3;
+  --color-tertiary: #ffb95f;
+  --color-on-primary-container: #00285d;
+  --color-surface-container-lowest: #0b0e15;
+  --color-surface-container-high: #272a31;
+  --color-on-error: #690005;
+  --color-on-tertiary: #472a00;
+  --color-inverse-on-surface: #2e3038;
+  --color-on-tertiary-fixed-variant: #653e00;
+  --color-on-secondary: #003824;
+  --color-secondary-fixed-dim: #4edea3;
+}
+
+body {
+  background-color: #0B1120;
+  color: #e1e2ec;
+  font-family: "Inter", sans-serif;
+  overflow-x: hidden;
+}
+
+.glass-panel, .glass-card {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(173, 198, 255, 0.5);
+}
+
+.progress-bar-stripes {
+  background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
+  background-size: 1rem 1rem;
+  animation: progress-stripes 1s linear infinite;
+}
+
+@keyframes progress-stripes {
+  from { background-position: 1rem 0; }
+  to { background-position: 0 0; }
+}
+
+/* Ambient Background Glow */
+.ambient-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(77, 142, 255, 0.15) 0%, transparent 60%);
+}
+
+/* Checkmark Animation */
+.check-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: #4d8eff;
+  fill: none;
+  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.check-path {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke: #4d8eff;
+  fill: none;
+  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+}
+
+.check-wrapper {
+  animation: scale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  filter: drop-shadow(0 0 12px rgba(77, 142, 255, 0.4));
+}
+
+@keyframes stroke {
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes scale {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Timeline connector */
+.timeline-line {
+  position: absolute;
+  left: 19px;
+  top: 24px;
+  bottom: -24px;
+  width: 2px;
+  background: rgba(66, 71, 84, 0.4);
+  z-index: 0;
+}
+.timeline-card:last-child .timeline-line {
+  display: none;
+}
+
+/* Hide scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
