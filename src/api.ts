@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// During local development Vite proxies this path to the FastAPI backend,
+// keeping browser requests same-origin and avoiding CORS requirements.
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export interface ApiReport {
   id: string;
