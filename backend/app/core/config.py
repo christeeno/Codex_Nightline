@@ -38,10 +38,17 @@ class Settings(BaseSettings):
         "https://huggingface.co/peterhdd/pothole-detection-yolov8/resolve/main/best.pt"
     )
     helmet_model_path: str = "vendor/Bike-Helmet-Detectionv2/weights/best.pt"
-    max_upload_size_mb: int = 100
+    # Dashcam footage is commonly larger than 100 MB; deployments can lower
+    # this through MAX_UPLOAD_SIZE_MB when storage limits require it.
+    max_upload_size_mb: int = 500
     supported_formats: str = "mp4,mov,avi"
     log_level: str = "INFO"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    # Vite uses 5173 by default, while this project runs its development UI on
+    # 3000. Allow both common local origins (and their loopback equivalents).
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     # License-plate recognition values are deployment-specific and must not
     # be embedded in the detector or OCR pipeline.
