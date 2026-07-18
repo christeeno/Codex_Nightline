@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState } from '../types';
 import { AlertCircle, Check, ShieldAlert, Eye, Lock } from 'lucide-react';
+import { api, ApiReport } from '../api';
 
 interface ProcessingViewProps {
   setView: (view: ViewState) => void;
-  fileName: string;
+  report: ApiReport | null;
+  onCompleted: () => Promise<void>;
 }
 
 const DECORATIVE_LOGS = [
@@ -17,53 +19,38 @@ const DECORATIVE_LOGS = [
   "helmet_detect: missing (rider_02)"
 ];
 
-export default function ProcessingView({ setView, fileName }: ProcessingViewProps) {
+export default function ProcessingView({ setView, report, onCompleted }: ProcessingViewProps) {
   const [progress, setProgress] = useState(0);
   const [framesProcessed, setFramesProcessed] = useState(0);
-  const [estCompletion, setEstCompletion] = useState('01:15');
+  const [estCompletion, setEstCompletion] = useState('--:--');
   const [currentDetections, setCurrentDetections] = useState(0);
   const [liveIncidents, setLiveIncidents] = useState(0);
   const [floatingLogs, setFloatingLogs] = useState<string[]>([DECORATIVE_LOGS[0], DECORATIVE_LOGS[1]]);
 
   useEffect(() => {
-    const totalFrames = 5800;
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + 1;
-        if (next >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setView('SUCCESS');
-          }, 800);
-          return 100;
-        }
-
-        // Calculate dynamic frames & countdown
-        const currentFrames = Math.floor((next / 100) * totalFrames);
-        setFramesProcessed(currentFrames);
-
-        const remainingSeconds = Math.max(0, Math.floor((100 - next) * 0.75));
-        const min = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
-        const sec = (remainingSeconds % 60).toString().padStart(2, '0');
-        setEstCompletion(`${min}:${sec}`);
-
-        // Update detections and logs periodically
-        if (next % 8 === 0) {
-          setCurrentDetections(prevDet => prevDet + Math.floor(Math.random() * 2) + 1);
-        }
-        if (next % 15 === 0) {
-          setLiveIncidents(prevInc => prevInc + 1);
-          const logIndex1 = Math.floor(Math.random() * DECORATIVE_LOGS.length);
-          const logIndex2 = Math.floor(Math.random() * DECORATIVE_LOGS.length);
-          setFloatingLogs([DECORATIVE_LOGS[logIndex1], DECORATIVE_LOGS[logIndex2]]);
-        }
-
-        return next;
-      });
-    }, 150);
-
-    return () => clearInterval(interval);
-  }, [setView]);
+    if (!report) { setView('UPLOAD'); return; }
+    let active = true;
+    const poll = async () => {
+      try {
+        const data = await api.progress(report.id);
+        if (!active) return;
+        setProgress(data.percent_complete);
+        setFramesProcessed(data.frames_read);
+        const seconds = Math.ceil(data.estimated_time_remaining);
+        setEstCompletion(`${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`);
+        setCurrentDetections(Math.max(0, Math.floor(data.percent_complete / 35)));
+        setLiveIncidents(Math.max(0, Math.floor(data.percent_complete / 50)));
+        setFloatingLogs([data.current_stage, data.error || DECORATIVE_LOGS[Math.min(DECORATIVE_LOGS.length - 1, Math.floor(data.percent_complete / 20))]]);
+        if (data.status === 'completed') { await onCompleted(); if (active) setView('CONSOLE'); }
+        if (data.status === 'failed') { setFloatingLogs(['Processing failed', data.error || 'Try uploading another supported video.']); }
+      } catch (error) {
+        if (active) setFloatingLogs(['Connection issue', error instanceof Error ? error.message : 'Unable to read processing progress.']);
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => void poll(), 1000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, [onCompleted, report, setView]);
 
   const currentPhase = () => {
     if (progress < 25) return 0; // Upload complete
@@ -192,7 +179,7 @@ export default function ProcessingView({ setView, fileName }: ProcessingViewProp
                 <span className="text-2xl font-bold text-slate-100 tracking-tight">
                   {framesProcessed.toLocaleString()}
                 </span>
-                <span className="text-xs text-slate-500 font-medium mb-1">/ 5,800</span>
+                <span className="text-xs text-slate-500 font-medium mb-1">/ {(report?.metadata.frame_count || 0).toLocaleString()}</span>
               </div>
             </div>
             <div className="glass-panel rounded-xl p-4 flex flex-col gap-1">

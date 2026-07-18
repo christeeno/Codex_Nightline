@@ -58,12 +58,8 @@ export default function CitizenDashboardView({ setView, stats }: CitizenDashboar
       <section className="pt-24 px-8 pb-8 shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-900/40 bg-slate-950/20">
         <div>
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-              <img 
-                alt="Trooper Avatar" 
-                className="w-full h-full object-cover" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCwadGntoKIFFfNgq2WnLzfpj9sXzQnQ7YFGnPz_ZY9P9G1fqVg45a7sno1w37gb0SM2zFl2zlFvGvkweD65wjM0kwAa7yW3Tv3nRtBoc5ZpdWt0NOg50mKEUitAW6txGRVcF1EpZuMFjstf1W6sgwp-GoskYD-NDfaqCMGSz7_qZvSJba9mIMnybWLd900gmvCpsiWX5jM9JPgSXxWKe5GPlqFnO1JL1Y_O78xaQZp7dIPzPevfifSNmGcTDq7m63ZsZjAmne2OU" 
-              />
+            <div className="w-12 h-12 rounded-full border-2 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)] bg-blue-500/20 flex items-center justify-center text-sm font-bold text-blue-100">
+              PA
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -69,13 +69,9 @@ export default function Header({ currentView, setView }: HeaderProps) {
           
           <div 
             onClick={() => setView('CITIZEN_DASHBOARD')}
-            className="w-10 h-10 rounded-full overflow-hidden border-2 border-blue-400/50 cursor-pointer hover:border-blue-400 transition-colors"
+            className="w-10 h-10 rounded-full border-2 border-blue-400/50 cursor-pointer hover:border-blue-400 transition-colors bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-200"
           >
-            <img 
-              alt="User profile avatar" 
-              className="w-full h-full object-cover" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCwadGntoKIFFfNgq2WnLzfpj9sXzQnQ7YFGnPz_ZY9P9G1fqVg45a7sno1w37gb0SM2zFl2zlFvGvkweD65wjM0kwAa7yW3Tv3nRtBoc5ZpdWt0NOg50mKEUitAW6txGRVcF1EpZuMFjstf1W6sgwp-GoskYD-NDfaqCMGSz7_qZvSJba9mIMnybWLd900gmvCpsiWX5jM9JPgSXxWKe5GPlqFnO1JL1Y_O78xaQZp7dIPzPevfifSNmGcTDq7m63ZsZjAmne2OU"
-            />
+            PA
           </div>
         </div>
       </div>

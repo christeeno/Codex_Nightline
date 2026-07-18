@@ -211,11 +211,7 @@ export default function LandingView({ setView }: LandingViewProps) {
               </p>
               
               <div className="h-48 w-full bg-slate-950 rounded-xl border border-slate-800/50 overflow-hidden relative">
-                <img 
-                  className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWeJbUO1UKQwAriNl6y61IVwA2HMjj-fkOphOS0AzZIjJWF9o8tH9QZbiSGPyuNj3bjSzHksryKF9GvlUmKplWqFj3qtzDicPD9z_mI2t9swbysY9r7rUtte3ZPb4_vi8qB3ZdN3WTmGdoBh960wBXPbRjdkQWUTsKJ9Xn2ODx3-uV7JXr6omtaK684nSmwplX5To0qUYkuFnk-2A0yoAJrdyh2oWXNUZqnxh0suH_ntbQO4xF3dhPzyaOSk6C506XmGShGXbRoXI"
-                  alt="Traffic analysis"
-                />
+                <div className="absolute inset-0 bg-gradient-to-br from-red-950 via-slate-950 to-slate-900 group-hover:scale-105 transition-transform duration-700" />
               </div>
             </div>
 
@@ -235,11 +231,7 @@ export default function LandingView({ setView }: LandingViewProps) {
               </p>
               
               <div className="h-36 w-full bg-slate-950 rounded-xl border border-slate-800/50 overflow-hidden relative">
-                <img 
-                  className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTpptbgcCUqtUvlYpyT7RybSuL7Dms6oonHPPABxfXS3uqDiruMPnVubBN1_B3XIdWtejEA4rTycrsH2FggT6rk0w0f88-RnCTn55HT2zpN9cQE-BrFJmy9Kc4HYSmp_lqwSpB4EL-YzVUEVaiZh_pUbSczNE93hgnb-xHtysGLDusuy310xU9NXr2T-Vq0M_o1lKSnZsI8ujXqDaIZmdXgNNgrKaxtkx31NdmfseH4TWbUF5tydTRk5GhGc8-1SnXtN37fFK2n7U"
-                  alt="Road detection map"
-                />
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-950 via-slate-950 to-slate-900 group-hover:scale-105 transition-transform duration-700" />
               </div>
             </div>
 
@@ -322,11 +314,7 @@ export default function LandingView({ setView }: LandingViewProps) {
               ></iframe>
             ) : (
               <>
-                <img 
-                  className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-102 transition-transform duration-500" 
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxDRKnvSOaLslHSMMmon49-s0gsWh2D_5PQ-NOUiSv-Q0y398B8ERU_SdyQosQZ4fIhcjsq90d5fjg5Ky9VmNhRS7OXhLB-9kI7Ey0WZG_uTGT5Jtsx-vcd4wefnDIV4x0loUTvebOV6lpdCQpUE7UQIWst848MNOIeIkCTr8Vl8FIBF72sLe3QLhuLo9-EWN8vNC50upkj4Lvj1_5PVEchUiZip4g6cMabb4uVcOXFC8mJhkxx5_LsFTwn-EKdlCOW9i0_GVNWkQ"
-                  alt="Platform video player"
-                />
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-slate-950 to-slate-900 opacity-60 group-hover:scale-102 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-slate-950/40 group-hover:bg-slate-950/20 transition-colors duration-300"></div>
                 <div className="w-20 h-20 rounded-full bg-blue-500/80 backdrop-blur-md flex items-center justify-center relative z-10 group-hover:scale-110 transition-transform duration-300 shadow-[0_0_30px_rgba(59,130,246,0.4)]">
                   <Play size={32} className="text-white ml-1" fill="currentColor" />

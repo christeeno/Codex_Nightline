@@ -1,6 +1,0 @@
-{
-  "name": "PARA AI",
-  "description": "Autonomous road intelligence and dashcam footage analysis console for traffic violations, road integrity, and civic reporting.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

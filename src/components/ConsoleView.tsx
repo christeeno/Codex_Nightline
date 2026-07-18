@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ViewState, Incident } from '../types';
 import { 
   Check, 
@@ -19,15 +19,17 @@ import {
 interface ConsoleViewProps {
   setView: (view: ViewState) => void;
   incidents: Incident[];
-  setIncidents: React.Dispatch<React.SetStateAction<Incident[]>>;
-  updateStats: (type: 'APPROVE' | 'REJECT', points?: number) => void;
+  onReview: (incidentId: string, action: 'APPROVE' | 'REJECT') => Promise<void>;
+  onSubmit: () => Promise<void>;
+  canSubmit: boolean;
 }
 
-export default function ConsoleView({ setView, incidents, setIncidents, updateStats }: ConsoleViewProps) {
+export default function ConsoleView({ setView, incidents, onReview, onSubmit, canSubmit }: ConsoleViewProps) {
   const [selectedId, setSelectedId] = useState<string>(incidents[0]?.id || '');
   const [filterType, setFilterType] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Active Incident
   const activeIncident = incidents.find(inc => inc.id === selectedId) || incidents[0];
@@ -37,7 +39,18 @@ export default function ConsoleView({ setView, incidents, setIncidents, updateSt
     return incidents.filter(inc => inc.type === type && inc.status === 'Pending').length;
   };
 
-  const handleAction = (id: string, action: 'APPROVE' | 'REJECT') => {
+  useEffect(() => {
+    if (!incidents.find(item => item.id === selectedId)) setSelectedId(incidents[0]?.id || '');
+  }, [incidents, selectedId]);
+
+  useEffect(() => {
+    const incident = incidents.find(item => item.id === selectedId);
+    if (incident && videoRef.current && incident.timestampSeconds !== undefined) {
+      videoRef.current.currentTime = incident.timestampSeconds;
+    }
+  }, [incidents, selectedId]);
+
+  const handleAction = async (id: string, action: 'APPROVE' | 'REJECT') => {
     const inc = incidents.find(i => i.id === id);
     if (!inc) return;
 
@@ -47,19 +60,12 @@ export default function ConsoleView({ setView, incidents, setIncidents, updateSt
       return;
     }
 
-    setIncidents(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, status: action === 'APPROVE' ? 'Verified' : 'Rejected' };
-      }
-      return item;
-    }));
-
-    if (action === 'APPROVE') {
-      updateStats('APPROVE', inc.rewardCr);
-      showToast(`Citation approved! +${inc.rewardCr} Cr credited to Trooper.`);
-    } else {
-      updateStats('REJECT');
-      showToast('Incident marked as false positive.');
+    try {
+      await onReview(id, action);
+      showToast(action === 'APPROVE' ? `Citation approved! +${inc.rewardCr} Cr credited.` : 'Incident marked as false positive.');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to save the review.');
+      return;
     }
 
     // Auto-select next pending incident
@@ -107,6 +113,13 @@ export default function ConsoleView({ setView, incidents, setIncidents, updateSt
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => void onSubmit().catch(error => showToast(error instanceof Error ? error.message : 'Submission failed.'))}
+            disabled={!canSubmit}
+            className={`text-xs px-4 py-2.5 rounded-lg transition-all font-medium ${canSubmit ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 cursor-pointer' : 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed'}`}
+          >
+            Submit Verified Report
+          </button>
           <button 
             onClick={() => setView('UPLOAD')}
             className="text-xs bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800 px-4 py-2.5 rounded-lg text-slate-300 transition-all font-medium cursor-pointer"
@@ -330,6 +343,17 @@ export default function ConsoleView({ setView, incidents, setIncidents, updateSt
                   <span>Plate: {activeIncident.licensePlate}</span>
                 </div>
               </div>
+              {activeIncident.videoUrl && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => { const player = videoRef.current; if (player) { player.currentTime = activeIncident.timestampSeconds || 0; void player.play(); } }}
+                    className="text-xs text-blue-300 border border-blue-500/30 hover:bg-blue-500/10 px-3 py-2 rounded-lg cursor-pointer"
+                  >
+                    Jump To Video • {activeIncident.time}
+                  </button>
+                  <video ref={videoRef} src={activeIncident.videoUrl} controls className="h-10 max-w-[60%] rounded border border-slate-800" />
+                </div>
+              )}
             </div>
 
             {/* Evidence details card */}

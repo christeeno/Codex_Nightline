@@ -17,6 +17,16 @@ export interface Incident {
   thumbnailUrl: string;
   evidenceUrl: string;
   rewardCr: number;
+  timestampSeconds?: number;
+  ocrConfidence?: number | null;
+}
+
+export interface SubmissionSummary {
+  trackingId: string;
+  submittedAt: string;
+  incidentCount: number;
+  rewardCredits: number;
+  governmentResponse: string;
 }
 
 export interface DashboardStats {

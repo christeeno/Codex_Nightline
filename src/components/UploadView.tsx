@@ -1,36 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { ViewState } from '../types';
 import { UploadCloud, PlayCircle, X, BrainCircuit } from 'lucide-react';
+import { api, ApiReport } from '../api';
 
 interface UploadViewProps {
   setView: (view: ViewState) => void;
-  setUploadedFile: (file: { name: string; size: string }) => void;
+  onUploadComplete: (report: ApiReport) => void;
 }
 
-export default function UploadView({ setView, setUploadedFile }: UploadViewProps) {
+export default function UploadView({ setView, onUploadComplete }: UploadViewProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const [file, setFile] = useState<{ name: string; size: string } | null>(null);
   const [progress, setProgress] = useState(0);
   const [uploadSpeed, setUploadSpeed] = useState('0.0 MB/s');
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (file && progress < 100) {
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          const next = prev + Math.floor(Math.random() * 15) + 5;
-          const currentSpeed = (Math.random() * 0.8 + 0.8).toFixed(1);
-          setUploadSpeed(`${currentSpeed} MB/s`);
-          if (next >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return next;
-        });
-      }, 600);
-    }
-    return () => clearInterval(interval);
-  }, [file, progress]);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<ApiReport | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -42,12 +27,26 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
     }
   };
 
-  const processFile = (fileName: string, fileSize: number) => {
+  const processFile = async (selectedFile: File) => {
+    const fileName = selectedFile.name;
+    const fileSize = selectedFile.size;
     const formattedSize = (fileSize / (1024 * 1024)).toFixed(1) + ' MB';
     const newFile = { name: fileName, size: formattedSize };
     setFile(newFile);
-    setProgress(0);
-    setUploadedFile(newFile);
+    setReport(null);
+    setError(null);
+    setProgress(10);
+    setUploadSpeed('Uploading securely…');
+    try {
+      const uploaded = await api.upload(selectedFile);
+      setProgress(100);
+      setUploadSpeed('Validated');
+      setReport(uploaded);
+      onUploadComplete(uploaded);
+    } catch (uploadError) {
+      setProgress(0);
+      setError(uploadError instanceof Error ? uploadError.message : 'Upload failed. Please try again.');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -56,25 +55,24 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
     setIsDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
-      processFile(droppedFile.name, droppedFile.size);
+      void processFile(droppedFile);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
-      processFile(selectedFile.name, selectedFile.size);
+      void processFile(selectedFile);
     }
   };
 
-  const triggerUpload = () => {
-    const randomNum = Math.floor(Math.random() * 9000) + 1000;
-    processFile(`dashcam_${randomNum}.mp4`, 48024888); // ~45.8 MB
-  };
+  const triggerUpload = () => inputRef.current?.click();
 
   const cancelUpload = () => {
     setFile(null);
     setProgress(0);
+    setReport(null);
+    setError(null);
   };
 
   return (
@@ -119,10 +117,12 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
           </button>
           
           <input 
-            type="file" 
+            ref={inputRef}
+            type="file"
             className="hidden" 
             accept=".mp4,.mov,.avi" 
-            onChange={handleFileChange} 
+            onClick={(event) => event.stopPropagation()}
+            onChange={handleFileChange}
           />
         </div>
 
@@ -133,11 +133,7 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
             
             {/* Thumbnail */}
             <div className="w-full md:w-48 h-32 rounded-xl overflow-hidden flex-shrink-0 relative bg-slate-900 border border-slate-800/40">
-              <img 
-                alt="Video thumbnail" 
-                className="w-full h-full object-cover opacity-80" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuABaV0vPFayoIT4mw_Nlo-bYGKmZnfv4W353e82aCfjCVgTLwOuyo_7HIxUm9j5spSEK6BvwXQJvNIN6w1x_ppeWKNZYmlnRW6bzx79spyVX8v_cDDiyajMOBu_svun8NamTins-TsGg7WGEfp228IexYC9Rh-L5kQnWAp5ZlQ3Ef1Ip7EPjdf46gzLcXPfhH3SQJ3maCcoxov7gqq1KyPN7TR5npOY0AxbHxDZ6BEtCE9tS9KnVwzKftHv2ceI9nv3YVv-P6__fFI" 
-              />
+              <div className="w-full h-full bg-gradient-to-br from-blue-950 via-slate-900 to-slate-950" />
               <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40">
                 <PlayCircle className="text-blue-300" size={32} />
               </div>
@@ -184,10 +180,10 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
         {/* Action Area */}
         <div className="flex justify-end pt-4">
           <button
-            onClick={() => setView('PROCESSING')}
-            disabled={!file || progress < 100}
+            onClick={() => { if (report) { void api.analyze(report.id).then(() => setView('PROCESSING')).catch(error => setError(error.message)); } }}
+            disabled={!report || progress < 100}
             className={`px-8 py-3 rounded-xl font-display text-sm font-medium border flex items-center gap-2 transition-all duration-300 cursor-pointer ${
-              file && progress === 100
+              report && progress === 100
                 ? 'bg-blue-500 hover:bg-blue-400 text-white border-blue-400 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:scale-[1.02]'
                 : 'bg-slate-900 text-slate-500 border-slate-800/50 cursor-not-allowed opacity-55'
             }`}
@@ -196,6 +192,7 @@ export default function UploadView({ setView, setUploadedFile }: UploadViewProps
             Analyze Footage
           </button>
         </div>
+        {error && <p role="alert" className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">{error}</p>}
       </div>
     </div>
   );

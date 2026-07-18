@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { ViewState } from '../types';
+import { SubmissionSummary } from '../types';
 import { Home, Download, Receipt, Clock, AlertCircle, Sparkles } from 'lucide-react';
 
 interface SuccessViewProps {
   setView: (view: ViewState) => void;
   fileName: string;
+  submission: SubmissionSummary | null;
 }
 
-export default function SuccessView({ setView, fileName }: SuccessViewProps) {
+export default function SuccessView({ setView, fileName, submission }: SuccessViewProps) {
   const [downloaded, setDownloaded] = useState(false);
   
   // Dynamic Local Time Extraction
   const getSubmissionTime = () => {
-    const now = new Date();
+    const now = submission?.submittedAt ? new Date(submission.submittedAt) : new Date();
     let hours = now.getHours();
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -52,7 +54,7 @@ export default function SuccessView({ setView, fileName }: SuccessViewProps) {
         <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 py-1.5 px-4 rounded-full mb-10">
           <Receipt size={14} className="text-blue-300" />
           <span className="font-display text-[10px] text-blue-300 font-bold uppercase tracking-wider">
-            Tracking ID: #PARA-82931-AI
+            Tracking ID: #{submission?.trackingId || 'PENDING'}
           </span>
         </div>
 
@@ -80,7 +82,7 @@ export default function SuccessView({ setView, fileName }: SuccessViewProps) {
               </span>
             </div>
             <span className="font-display text-lg font-bold text-slate-100 mt-1">
-              8
+              {submission?.incidentCount ?? 0}
             </span>
           </div>
 
@@ -94,10 +96,12 @@ export default function SuccessView({ setView, fileName }: SuccessViewProps) {
               </span>
             </div>
             <span className="font-display text-lg font-bold text-emerald-300 mt-1">
-              +450 <span className="text-slate-500 text-xs font-normal">Cr</span>
+              +{submission?.rewardCredits ?? 0} <span className="text-slate-500 text-xs font-normal">Cr</span>
             </span>
           </div>
         </div>
+
+        {submission?.governmentResponse && <p className="mt-6 text-center text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-3">{submission.governmentResponse}</p>}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row w-full gap-4 justify-center">

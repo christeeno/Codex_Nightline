@@ -1,0 +1,6 @@
+[submodule "backend/vendor/pothole-detection-yolo"]
+	path = backend/vendor/pothole-detection-yolo
+	url = https://github.com/PeterHdd/pothole-detection-yolo.git
+[submodule "backend/vendor/Bike-Helmet-Detectionv2"]
+	path = backend/vendor/Bike-Helmet-Detectionv2
+	url = https://github.com/Viddesh1/Bike-Helmet-Detectionv2.git
