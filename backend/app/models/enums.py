@@ -1,5 +1,4 @@
-"""Closed value sets used by the PARA AI database and API contracts."""
-
+"""Closed value sets used by PARA AI persistence and API contracts."""
 from enum import Enum
 
 
