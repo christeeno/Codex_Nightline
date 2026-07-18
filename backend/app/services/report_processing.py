@@ -53,6 +53,19 @@ def _model(name: str, path: str) -> Any:
         raise ModelLoadError(f"Unable to load {name} model: {exc}") from exc
 
 
+def _optional_model(name: str, path: str, warnings: list[str]) -> Any | None:
+    """Load a model, allowing the configured local demo mode to continue without it."""
+    try:
+        return _model(name, path)
+    except ModelLoadError as exc:
+        if not settings.demo_inference:
+            raise
+        message = str(exc)
+        warnings.append(message)
+        logger.warning("%s; continuing in demo mode without this detector", message)
+        return None
+
+
 def _boxes(model: Any, image: np.ndarray, confidence: float) -> list[tuple[str, float, BoundingBox]]:
     """Normalize Ultralytics output without depending on a model-specific class map."""
     result = model.predict(image, conf=confidence, verbose=False)
@@ -175,8 +188,13 @@ def process_report(report_id: str) -> None:
             return
         # Clearing stale results makes a deliberate re-analysis deterministic.
         database.execute(delete(Incident).where(Incident.report_id == report.id))
-        traffic_model = _model("Bike-Helmet-Detectionv2", settings.helmet_model_path)
-        pothole_model = _model("PeterHdd/pothole-detection-yolo", settings.model_path)
+        model_warnings: list[str] = []
+        traffic_model = _optional_model(
+            "Bike-Helmet-Detectionv2", settings.helmet_model_path, model_warnings
+        )
+        pothole_model = _optional_model(
+            "PeterHdd/pothole-detection-yolo", settings.model_path, model_warnings
+        )
         traffic_sampler, road_sampler = FrameSampler(settings.traffic_fps), FrameSampler(settings.road_fps)
         traffic_next = road_next = 0.0
         recent: dict[str, Incident] = {}
@@ -185,10 +203,10 @@ def process_report(report_id: str) -> None:
             for frame in reader.frames():
                 traffic_due, traffic_next = traffic_sampler.accepts(frame, traffic_next)
                 road_due, road_next = road_sampler.accepts(frame, road_next)
-                if traffic_due:
+                if traffic_due and traffic_model is not None:
                     for confidence, motorcycle in _traffic_candidates(traffic_model, frame.image, settings.pothole_confidence):
                         _record(database, report, recent, kind="HELMET_VIOLATION", title="Missing Helmet Detection", timestamp=frame.timestamp, frame_number=frame.frame_number, confidence=confidence, image=frame.image, motorcycle=motorcycle)
-                if road_due:
+                if road_due and pothole_model is not None:
                     for confidence, _ in _pothole_candidates(pothole_model, frame.image, settings.pothole_confidence):
                         _record(database, report, recent, kind="POTHOLE", title="Road Surface Pothole", timestamp=frame.timestamp, frame_number=frame.frame_number, confidence=confidence, image=frame.image)
                 if frame.frame_number % max(1, int(metadata.fps)) == 0:
@@ -197,7 +215,12 @@ def process_report(report_id: str) -> None:
             report.processing_time = monotonic() - started
             report.completed_at = datetime.now(timezone.utc)
             report.status = "READY_FOR_REVIEW"
-            report.summary_json = {"helmet_violations": sum(item.type == "HELMET_VIOLATION" for item in recent.values()), "potholes": sum(item.type == "POTHOLE" for item in recent.values())}
+            report.summary_json = {
+                "helmet_violations": sum(item.type == "HELMET_VIOLATION" for item in recent.values()),
+                "potholes": sum(item.type == "POTHOLE" for item in recent.values()),
+                "model_warnings": model_warnings,
+                "inference_mode": "demo" if model_warnings else "model",
+            }
             _set_progress(report, read=metadata.frame_count, stage="Ready for human verification", percent=100, timestamp=metadata.duration)
             database.commit()
     except (ModelLoadError, VideoOpenError, OSError, ValueError) as exc:
