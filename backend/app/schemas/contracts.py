@@ -1,4 +1,4 @@
-"""Pydantic request and response models for the public REST contract."""
+"""Pydantic request and response contracts for the public REST interface."""
 
 from datetime import datetime
 from typing import Any, Generic, Optional, TypeVar
@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import IncidentStatus, IncidentType, ReportStatus, SubmissionStatus
+from app.models.enums import IncidentStatus, IncidentType, ReportStatus, SubmissionStatus
 
 
 class Schema(BaseModel):
@@ -20,7 +20,6 @@ class UploadVideoRequest(Schema):
 
 
 class AnalyzeVideoRequest(Schema):
-    """Reserved options for asynchronous processing to be added later."""
     force: bool = False
 
 

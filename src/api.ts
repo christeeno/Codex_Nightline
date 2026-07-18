@@ -51,15 +51,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, init);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Request failed (${response.status}).`);
+    throw new Error(body.detail || body.errors?.[0] || `Request failed (${response.status}).`);
   }
-  return response.json() as Promise<T>;
+  const body = await response.json() as T | { data: T };
+  return typeof body === 'object' && body !== null && 'data' in body ? body.data : body as T;
 }
 
 export const api = {
   upload: (file: File) => {
     const data = new FormData();
-    data.append('file', file);
+    data.append('video', file);
     return request<ApiReport>('/upload', { method: 'POST', body: data });
   },
   analyze: (id: string) => request(`/analyze/${id}`, { method: 'POST' }),

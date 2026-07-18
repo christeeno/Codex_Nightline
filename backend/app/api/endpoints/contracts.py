@@ -31,14 +31,14 @@ def _incident_or_404(session: SessionDep, report_id: UUID, incident_id: UUID) ->
     return incident
 
 
-@router.post("/upload", response_model=ApiResponse[UploadResponse], status_code=status.HTTP_201_CREATED, summary="Register an uploaded dashcam video", description="Creates a pending report from video metadata. Binary file storage is outside this interface.")
+@router.post("/upload", response_model=ApiResponse[UploadResponse], status_code=status.HTTP_201_CREATED, summary="Register an uploaded dashcam video", description="Creates a pending report from video metadata. Binary storage is outside this interface.")
 def upload_video(payload: UploadVideoRequest, session: SessionDep, logger: LoggerDep, settings: SettingsDep):
     report = crud.create_report(session, {**payload.model_dump(), "status": ReportStatus.PENDING.value})
     logger.info("Registered report %s for %s", report.id, settings.app_name)
     return ApiResponse(message="Video registered successfully", data=UploadResponse(report_id=report.id, filename=report.video_name or report.filename, duration=report.video_duration, status=ReportStatus(report.status)))
 
 
-@router.post("/analyze/{report_id}", response_model=ApiResponse[ProgressResponse], summary="Queue a report for analysis", description="Defines the asynchronous-analysis contract only; no processing is started yet.")
+@router.post("/analyze/{report_id}", response_model=ApiResponse[ProgressResponse], summary="Queue a report for analysis", description="Defines the async-analysis contract only; no processing is started yet.")
 def analyze_video(report_id: UUID, payload: AnalyzeVideoRequest, session: SessionDep, logger: LoggerDep, settings: SettingsDep):
     report = _report_or_404(session, report_id)
     logger.info("Analysis requested for report %s (force=%s, app=%s)", report.id, payload.force, settings.app_name)

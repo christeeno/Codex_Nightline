@@ -1,10 +1,7 @@
-"""HTTP contracts for uploads and live processing progress."""
-
+"""Upload and progress response contracts."""
 from datetime import datetime
 from typing import Literal
-
 from pydantic import BaseModel, Field
-
 
 class VideoMetadataResponse(BaseModel):
     filename: str
@@ -14,12 +11,10 @@ class VideoMetadataResponse(BaseModel):
     duration: float
     codec: str
 
-
 class ReportResponse(BaseModel):
     id: str
     status: str
     metadata: VideoMetadataResponse
-
 
 class ProgressResponse(BaseModel):
     report_id: str

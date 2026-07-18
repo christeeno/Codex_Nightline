@@ -41,8 +41,8 @@ export default function ProcessingView({ setView, report, onCompleted }: Process
         setCurrentDetections(Math.max(0, Math.floor(data.percent_complete / 35)));
         setLiveIncidents(Math.max(0, Math.floor(data.percent_complete / 50)));
         setFloatingLogs([data.current_stage, data.error || DECORATIVE_LOGS[Math.min(DECORATIVE_LOGS.length - 1, Math.floor(data.percent_complete / 20))]]);
-        if (data.status === 'completed') { await onCompleted(); if (active) setView('CONSOLE'); }
-        if (data.status === 'failed') { setFloatingLogs(['Processing failed', data.error || 'Try uploading another supported video.']); }
+        if (data.status === 'READY_FOR_REVIEW' || data.status === 'completed') { await onCompleted(); if (active) setView('CONSOLE'); }
+        if (data.status === 'FAILED' || data.status === 'failed') { setFloatingLogs(['Processing failed', data.error || 'Try uploading another supported video.']); }
       } catch (error) {
         if (active) setFloatingLogs(['Connection issue', error instanceof Error ? error.message : 'Unable to read processing progress.']);
       }

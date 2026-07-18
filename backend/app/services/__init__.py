@@ -1,8 +1,16 @@
 """Video processing services and engine orchestration."""
 
-from app.services.incident_engine import IncidentEngine
 from app.services.license_plate_recognition import LicensePlateRecognitionService
-from app.services.road_intelligence import RoadIntelligenceEngine, SampledFrame
+
+try:
+    from app.services.incident_engine import IncidentEngine
+except ModuleNotFoundError:  # pragma: no cover - optional in the compact backend build
+    IncidentEngine = None  # type: ignore[assignment,misc]
+
+try:
+    from app.services.road_intelligence import RoadIntelligenceEngine, SampledFrame
+except ModuleNotFoundError:  # pragma: no cover - optional in the compact backend build
+    RoadIntelligenceEngine = SampledFrame = None  # type: ignore[assignment,misc]
 
 # The traffic engine is delivered independently; do not prevent the road engine
 # from loading while that optional module is absent from a partial checkout.
@@ -12,11 +20,13 @@ except ModuleNotFoundError:  # pragma: no cover - depends on upstream module del
     TrafficFrame = TrafficViolationEngine = None  # type: ignore[assignment,misc]
 
 __all__ = [
-    "IncidentEngine",
     "LicensePlateRecognitionService",
-    "RoadIntelligenceEngine",
-    "SampledFrame",
 ]
+
+if IncidentEngine is not None:
+    __all__.append("IncidentEngine")
+if RoadIntelligenceEngine is not None:
+    __all__.extend(["RoadIntelligenceEngine", "SampledFrame"])
 
 if TrafficViolationEngine is not None:
     __all__.extend(["TrafficFrame", "TrafficViolationEngine"])

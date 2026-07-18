@@ -1,4 +1,4 @@
-"""Reusable CRUD operations; this module deliberately contains no AI logic."""
+"""Reusable CRUD operations with no processing or AI behaviour."""
 
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -18,7 +18,6 @@ def _apply_changes(instance: Any, values: dict[str, Any]) -> None:
 
 def create_report(session: Session, values: dict[str, Any]) -> Report:
     data = dict(values)
-    # These aliases preserve compatibility with the pre-existing upload model.
     data.setdefault("filename", data.get("video_name"))
     data.setdefault("duration", data.get("video_duration"))
     report = Report(**data)
@@ -41,8 +40,7 @@ def get_report(session: Session, report_id: UUID | str) -> Optional[Report]:
 
 
 def list_reports(session: Session, offset: int = 0, limit: int = 100) -> list[Report]:
-    statement = select(Report).order_by(Report.created_at.desc()).offset(offset).limit(limit)
-    return list(session.scalars(statement))
+    return list(session.scalars(select(Report).order_by(Report.created_at.desc()).offset(offset).limit(limit)))
 
 
 def create_incident(session: Session, values: dict[str, Any]) -> Incident:

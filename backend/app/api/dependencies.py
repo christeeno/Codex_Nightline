@@ -1,4 +1,4 @@
-"""Explicit dependencies shared by the HTTP endpoint contracts."""
+"""Explicit FastAPI dependencies shared by the REST contract."""
 
 import logging
 from typing import Annotated

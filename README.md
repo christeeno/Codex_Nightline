@@ -1,125 +1,111 @@
 # PARA AI
 
-## Project Overview
+PARA AI turns citizen-provided dashcam footage into reviewable road-safety reports. It detects motorcycle helmet violations and potholes, attaches timestamped evidence, runs plate OCR only when a helmet violation is confirmed, and supports a mock government submission after human review.
 
-PARA AI turns dashcam footage into actionable road intelligence. It helps teams identify traffic violations and road-surface hazards, review detected incidents, and prepare information for civic reporting.
-
-## Features
-
-- Upload MP4, MOV, or AVI dashcam footage for analysis.
-- Detect traffic violations, missing helmets, triple riding, and potholes.
-- Review confidence, evidence, location, and status for each incident.
-- Track processing progress and dashboard metrics.
-- Store uploaded footage and generated evidence through the FastAPI backend.
-
-## Architecture Diagram
+## Architecture
 
 ```text
-Dashcam footage
-      |
-      v
-React + Vite frontend  --->  FastAPI API  --->  Processing pipeline
-      |                         |                    |
-      v                         v                    v
-Dashboard and review UI      SQLite storage      Detection models
-                                                     |
-                                                     v
-                                           Incident records and evidence
+Dashcam upload → Video reader → Processing orchestrator
+                       ├→ Bike-Helmet-Detectionv2 → PaddleOCR (when eligible)
+                       └→ PeterHdd pothole YOLO
+                                      ↓
+                         Incident timeline → Human review
+                                      ↓
+                         Mock submission → Citizen dashboard
 ```
 
-## Technology Stack
+The backend reads the complete video stream. Traffic and road inference are scheduled by timestamp at configurable rates; no duration or frame-count cap is applied. Model objects are cached and reused for subsequent reports.
 
-- Frontend: React, TypeScript, Vite, Tailwind CSS, Lucide icons
-- Backend: Python, FastAPI, Pydantic, SQLAlchemy, SQLite
-- Computer vision: Ultralytics YOLO, OpenCV, PaddleOCR
-- Tooling: npm and pytest
+## Technology stack
 
-## AI Models Used
+- Frontend: React, TypeScript, Vite, Tailwind CSS
+- Backend: FastAPI, SQLAlchemy, SQLite, Uvicorn
+- Video/evidence: OpenCV
+- AI: Ultralytics YOLO, PaddleOCR
 
-- YOLO-based pothole detection, provided by the vendored `pothole-detection-yolo` project.
-- Helmet and vehicle detection adapters for traffic-safety analysis.
-- PaddleOCR for license-plate text extraction.
-- Gemini integration is configured through `GEMINI_API_KEY` when enabled by the application.
+## Repository layout
+
+```text
+src/                 React citizen and verification interface
+backend/app/api/     HTTP workflow endpoints
+backend/app/services/ video processing, frame sampling, OCR orchestration
+backend/app/adapters/ external-model compatibility boundaries
+backend/app/models/  SQLite persistence models
+backend/uploads/     runtime videos and evidence (ignored by Git)
+backend/weights/     locally supplied model weights (ignored by Git)
+docs/                demo and project handoff material
+```
+
+## Approved AI dependencies and model setup
+
+| Purpose | Approved source | Weight location |
+| --- | --- | --- |
+| Helmet violations | `Viddesh1/Bike-Helmet-Detectionv2` | `backend/vendor/Bike-Helmet-Detectionv2/weights/best.pt` (provided vendor checkout), or set `BIKE_HELMET_MODEL_PATH` |
+| Potholes | `PeterHdd/pothole-detection-yolo` | Download `best.pt` to `backend/weights/pothole/best.pt` and set `MODEL_PATH` to it |
+| License plates | PaddleOCR | PaddleOCR downloads its language models on first local initialization; ensure cache/network access during setup |
+
+The pothole adapter accepts only the pothole class: crack detection is intentionally not part of PARA AI. The helmet adapter requires a no-helmet observation associated with both a rider and motorcycle; pedestrians and cars cannot create helmet violations.
 
 ## Installation
 
-Prerequisites: Node.js 20+ and Python 3.12+.
+Prerequisites: Node.js 20+, Python 3.12+, and model weights described above.
 
 ```bash
-git clone https://github.com/christeeno/Codex_Nightline.git
-cd Codex_Nightline
 npm install
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Set optional frontend configuration in `.env.local`:
+Edit `backend/.env` to point `MODEL_PATH` at the pothole checkpoint if it is not available through the configured URL. Never commit `.env`, weights, uploaded video, or evidence.
 
-```bash
-GEMINI_API_KEY=your_api_key
-VITE_API_URL=http://localhost:8000
-```
+## Run the application
 
-Install the backend dependencies:
+In one terminal:
 
 ```bash
 cd backend
-cp .env.example .env
-python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-On Windows PowerShell, activate the virtual environment with `.venv\\Scripts\\Activate.ps1`.
-
-## Running Frontend
-
-From the repository root:
+In another terminal:
 
 ```bash
 npm run dev
 ```
 
-Open the URL reported by Vite (normally `http://localhost:3000`).
+The API documentation is at `http://localhost:8000/docs`; the Vite application is normally at `http://localhost:3000`.
 
-## Running Backend
+## API workflow
 
-From the `backend` directory with the virtual environment active:
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /upload` | Upload and validate MP4, MOV, or AVI footage |
+| `POST /analyze/{report_id}` | Start background full-video analysis |
+| `GET /reports` / `GET /reports/{id}` | List or inspect reports |
+| `GET /reports/{id}/progress` | Poll timestamp-accurate progress |
+| `GET /reports/{id}/incidents` | Fetch the review timeline |
+| `POST /reports/{id}/incidents/{incident_id}/approve` | Approve a reviewed incident |
+| `POST /reports/{id}/incidents/{incident_id}/reject` | Reject a false positive |
+| `POST /reports/{id}/submit` | Create a mock government tracking ID |
+| `GET /dashboard` | Fetch current citizen-dashboard totals |
 
-```bash
-uvicorn main:app --reload
-```
+## Demo workflow
 
-The API is available at `http://localhost:8000`, with interactive documentation at `http://localhost:8000/docs`.
+1. Upload a prepared dashcam clip.
+2. Start analysis and show progress reach 100%.
+3. Open the incident timeline and inspect timestamped evidence.
+4. Approve or reject each incident with a reviewer.
+5. Submit the reviewed report and show the generated `PARA-…` tracking ID.
+6. Open the dashboard to show the updated totals.
 
-## Demo Workflow
+## Limitations and future scope
 
-1. Start the backend and frontend services.
-2. Open PARA AI and select **Upload Footage**.
-3. Upload a supported dashcam video.
-4. Allow the processing pipeline to sample frames and create detections.
-5. Review incidents in the console, including confidence and evidence.
-6. Approve or reject incidents and use the dashboard to monitor results.
-
-## Folder Structure
-
-```text
-.
-├── src/                    # React frontend
-│   ├── components/          # Views and interface components
-│   ├── App.tsx              # Application state and routing
-│   └── main.tsx             # Frontend entry point
-├── backend/
-│   ├── app/                 # FastAPI routes, services, models, and adapters
-│   ├── tests/               # Backend test suite
-│   ├── uploads/             # Runtime video and evidence storage
-│   └── vendor/              # Pinned computer-vision dependencies
-├── package.json
-└── README.md
-```
-
-## Future Work
-
-- Connect the frontend upload flow to the live processing API.
-- Add asynchronous job execution and live progress updates.
-- Improve incident geolocation and map-based triage.
-- Add role-based access control and audit trails.
-- Expand model evaluation, monitoring, and human-review workflows.
+- Plate reading depends on crop size, motion blur, lighting, and camera angle; unreadable plates are returned as `UNKNOWN`.
+- Helmet accuracy depends on the supplied model labels and camera angle. The safety-first association rule may miss ambiguous cases rather than report a pedestrian or car.
+- Government submission is deliberately mocked; no agency data is transmitted.
+- SQLite is used for hackathon portability, not concurrent production-scale deployment.
+- Future work: authenticated user accounts, geolocation, a durable queue, reviewer roles, monitoring, and production government integrations.

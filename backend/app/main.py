@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.api.router import api_router
@@ -50,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+app.mount("/uploads", StaticFiles(directory=settings.upload_folder), name="uploads")
 
 
 @app.exception_handler(RequestValidationError)

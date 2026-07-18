@@ -1,4 +1,4 @@
-"""External model adapters."""
+"""External model adapters used by the processing worker."""
 
 from app.adapters.license_plate_detector import OpenCVPlateDetector, PlateCandidate
 from app.adapters.paddle_ocr import OCRText, PaddleOCRAdapter

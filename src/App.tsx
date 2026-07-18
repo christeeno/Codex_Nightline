@@ -23,7 +23,7 @@ const toIncident = (item: ApiIncident, report: ApiReport | null): Incident => ({
   confidence: item.confidence * 100,
   licensePlate: item.license_plate || '--',
   location: 'Dashcam route',
-  status: item.status === 'approved' ? 'Verified' : item.status === 'rejected' ? 'Rejected' : 'Pending',
+  status: item.status.toUpperCase() === 'APPROVED' ? 'Verified' : item.status.toUpperCase() === 'REJECTED' ? 'Rejected' : 'Pending',
   aiAnalysis: item.details.source === 'demo_inference' ? 'Demo inference result awaiting human confirmation.' : 'AI evidence awaiting human confirmation.',
   videoUrl: api.mediaUrl(report?.video_url || null),
   thumbnailUrl: api.mediaUrl(item.evidence_url),

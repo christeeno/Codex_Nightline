@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     incident_deduplication_seconds: float = 3.0
     incident_neighbour_frame_window: int = 5
     incident_default_status: str = "pending_review"
+    # Enables labelled synthetic incidents only when bundled model weights are absent.
+    # Set false in deployments that require model-only results.
+    demo_inference: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

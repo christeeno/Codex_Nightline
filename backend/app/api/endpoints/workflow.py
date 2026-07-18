@@ -33,6 +33,7 @@ def _report_data(report: Report, include_incidents: bool = False) -> dict:
     data = {
         "id": report.id,
         "filename": report.filename,
+        "video_url": f"/uploads/videos/{Path(report.video_path).name}",
         "status": report.status,
         "metadata": {
             "resolution": report.resolution,
@@ -148,8 +149,11 @@ def get_progress(report_id: str, database: Session = Depends(get_db)) -> dict:
         "status": report.status,
         "frames_read": progress.get("frames_read", 0),
         "frames_total": report.frame_count or 0,
+        "frames_remaining": max(0, (report.frame_count or 0) - progress.get("frames_read", 0)),
         "current_timestamp": progress.get("current_timestamp", 0),
+        "video_duration": report.duration or 0,
         "percent_complete": progress.get("percent_complete", 0),
+        "estimated_time_remaining": 0 if report.status in {"READY_FOR_REVIEW", "FAILED", "SUBMITTED"} else max(0, round((100 - progress.get("percent_complete", 0)) * 0.4, 1)),
         "current_stage": progress.get("current_stage", "Ready to analyze"),
         "error": report.processing_error,
     }}
@@ -194,8 +198,12 @@ def submit_report(report_id: str, database: Session = Depends(get_db)) -> dict:
         raise _not_found("Report")
     if report.status not in {"READY_FOR_REVIEW", "SUBMITTED"}:
         raise HTTPException(status_code=409, detail="Finish analysis before submitting this report.")
+    approved_count = database.scalar(select(func.count()).select_from(Incident).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
+    if report.status != "SUBMITTED" and approved_count == 0:
+        raise HTTPException(status_code=409, detail="Approve at least one incident before submitting.")
     if report.tracking_id:
-        return {"message": "Report was already submitted.", "data": {"report_id": report.id, "tracking_id": report.tracking_id, "status": "SUBMITTED"}}
+        reward = database.scalar(select(func.coalesce(func.sum(Incident.reward_credits), 0)).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
+        return {"message": "Report was already submitted.", "data": {"report_id": report.id, "tracking_id": report.tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": "Mock transport authority receipt accepted."}}
     tracking_id = f"PARA-{datetime.now(timezone.utc):%Y%m%d}-{uuid4().hex[:8].upper()}"
     submission = Submission(report_id=report.id, government_tracking_id=tracking_id, submission_status="SUBMITTED", response_json={"mock": True, "accepted_at": datetime.now(timezone.utc).isoformat()})
     report.status = "SUBMITTED"
@@ -204,7 +212,9 @@ def submit_report(report_id: str, database: Session = Depends(get_db)) -> dict:
     report.submitted_at = datetime.now(timezone.utc)
     database.add(submission)
     database.commit()
-    return {"message": "Mock government submission created.", "data": {"report_id": report.id, "tracking_id": tracking_id, "status": "SUBMITTED"}}
+    approved_count = database.scalar(select(func.count()).select_from(Incident).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
+    reward = database.scalar(select(func.coalesce(func.sum(Incident.reward_credits), 0)).where(Incident.report_id == report.id, Incident.status == "APPROVED")) or 0
+    return {"message": "Mock government submission created.", "data": {"report_id": report.id, "tracking_id": tracking_id, "status": "SUBMITTED", "submitted_at": report.submitted_at, "incident_count": approved_count, "reward_credits": reward, "government_response": "Mock transport authority receipt accepted."}}
 
 
 @router.get("/dashboard", summary="Get citizen dashboard totals")
@@ -215,4 +225,5 @@ def dashboard(database: Session = Depends(get_db)) -> dict:
     approved = count(select(func.count()).select_from(Incident).where(Incident.status == "APPROVED"))
     rejected = count(select(func.count()).select_from(Incident).where(Incident.status == "REJECTED"))
     rewards = count(select(func.coalesce(func.sum(Incident.reward_credits), 0)).where(Incident.status == "APPROVED"))
-    return {"message": "Dashboard retrieved successfully.", "data": {"submitted": submitted, "verified": approved, "pending": pending, "rejected": rejected, "rewards": rewards}}
+    recent = list(database.scalars(select(Report).order_by(Report.created_at.desc()).limit(5)))
+    return {"message": "Dashboard retrieved successfully.", "data": {"submitted": submitted, "verified": approved, "pending": pending, "rejected": rejected, "rewards": rewards, "risk_index": 12, "safety_score": 94, "routes_analyzed": submitted, "recent_activity": [_report_data(item) for item in recent], "demo_values": {"risk_index": True, "safety_score": True}}}
